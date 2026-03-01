@@ -1,0 +1,506 @@
+import { useState, useEffect } from 'react'
+import api from '../utils/axios'
+import toast from 'react-hot-toast'
+import { useSiteSettings } from '../context/SiteSettingsContext'
+
+export default function TransferModal({ isOpen, onClose, onSuccess }) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [users, setUsers] = useState([])
+  const [recentRecipients, setRecentRecipients] = useState([])
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [amount, setAmount] = useState('')
+  const [description, setDescription] = useState('')
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [loadingRecent, setLoadingRecent] = useState(false)
+  const [fee, setFee] = useState(0)
+  const [totalAmount, setTotalAmount] = useState(0)
+  const [step, setStep] = useState('search') // 'search' or 'confirm'
+  const [requires2FA, setRequires2FA] = useState(false)
+  const { settings: siteSettings } = useSiteSettings()
+
+  useEffect(() => {
+    if (amount && siteSettings) {
+      calculateFee()
+    }
+  }, [amount, siteSettings])
+
+  useEffect(() => {
+    if (isOpen && searchQuery.length === 0) {
+      fetchRecentRecipients()
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.length >= 2) {
+        searchUsers()
+      } else {
+        setUsers([])
+        if (searchQuery.length === 0) {
+          fetchRecentRecipients()
+        }
+      }
+    }, 300)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery])
+
+  const fetchRecentRecipients = async () => {
+    setLoadingRecent(true)
+    try {
+      // First get current user ID
+      const userResponse = await api.get('/api/auth/me')
+      if (!userResponse.data.success || !userResponse.data.user) {
+        setLoadingRecent(false)
+        return
+      }
+      
+      const currentUserId = userResponse.data.user._id || userResponse.data.user.id
+      
+      // Then get transfer history
+      const response = await api.get('/api/transfers/history')
+      if (response.data.success) {
+        // Get only sent transfers (where current user is the sender)
+        const sentTransfers = response.data.transfers.filter(transfer => {
+          const fromUserId = transfer.fromUserId?._id || transfer.fromUserId
+          return fromUserId && fromUserId.toString() === currentUserId.toString()
+        })
+        
+        // Extract unique recipients from recent sent transfers
+        const uniqueRecipients = new Map()
+        sentTransfers.forEach(transfer => {
+          if (transfer.toUserInfo && transfer.toUserId) {
+            const toUserId = transfer.toUserId?._id || transfer.toUserId
+            const userIdStr = toUserId.toString()
+            
+            // Only add if not already in map
+            if (!uniqueRecipients.has(userIdStr)) {
+              uniqueRecipients.set(userIdStr, {
+                _id: toUserId,
+                fullName: transfer.toUserInfo.fullName,
+                email: transfer.toUserInfo.email,
+                username: transfer.toUserInfo.username,
+                uniqueId: transfer.toUserInfo.uniqueId,
+                lastTransferDate: transfer.createdAt
+              })
+            } else {
+              // Update if this transfer is more recent
+              const existing = uniqueRecipients.get(userIdStr)
+              if (new Date(transfer.createdAt) > new Date(existing.lastTransferDate)) {
+                existing.lastTransferDate = transfer.createdAt
+              }
+            }
+          }
+        })
+        
+        // Convert map to array and sort by most recent transfer date
+        const recipientsArray = Array.from(uniqueRecipients.values())
+          .sort((a, b) => new Date(b.lastTransferDate) - new Date(a.lastTransferDate))
+          .slice(0, 10) // Limit to 10 most recent
+        
+        setRecentRecipients(recipientsArray)
+      }
+    } catch (error) {
+      console.error('Error fetching recent recipients:', error)
+      // Don't show error toast for this, just fail silently
+    } finally {
+      setLoadingRecent(false)
+    }
+  }
+
+  const searchUsers = async () => {
+    if (searchQuery.length < 2) return
+
+    setSearching(true)
+    try {
+      const response = await api.get(`/api/transfers/search?query=${encodeURIComponent(searchQuery)}`)
+      if (response.data.success) {
+        setUsers(response.data.users)
+      }
+    } catch (error) {
+      console.error('Error searching users:', error)
+      toast.error('Failed to search users')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  const calculateFee = () => {
+    if (!siteSettings?.transfer || !amount) {
+      setFee(0)
+      setTotalAmount(0)
+      return
+    }
+
+    const transferAmount = parseFloat(amount) || 0
+    const transferSettings = siteSettings.transfer
+
+    let calculatedFee = 0
+    if (transferSettings.feeType === 'percentage') {
+      calculatedFee = (transferAmount * transferSettings.fee) / 100
+    } else {
+      calculatedFee = transferSettings.fee
+    }
+
+    setFee(calculatedFee)
+    setTotalAmount(transferAmount + calculatedFee)
+  }
+
+  const handleUserSelect = (user) => {
+    setSelectedUser(user)
+    setStep('confirm')
+  }
+
+  const handleConfirm = async (e) => {
+    e.preventDefault()
+
+    if (!selectedUser || !amount) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    const transferAmount = parseFloat(amount)
+    if (isNaN(transferAmount) || transferAmount <= 0) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+
+    if (!siteSettings?.transfer) {
+      toast.error('Settings not loaded. Please try again.')
+      return
+    }
+
+    const transferSettings = siteSettings.transfer
+    const currency = siteSettings.site?.currency || 'USDT'
+
+    if (transferAmount < transferSettings.minAmount) {
+      toast.error(`Minimum transfer amount is ${transferSettings.minAmount} ${currency}`)
+      return
+    }
+
+    if (transferAmount > transferSettings.maxAmount) {
+      toast.error(`Maximum transfer amount is ${transferSettings.maxAmount} ${currency}`)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await api.post('/api/transfers/create', {
+        toUserId: selectedUser._id,
+        amount: transferAmount,
+        description: description.trim(),
+        twoFactorCode: twoFactorCode || undefined
+      })
+
+      // Check if 2FA is required
+      if (response.data.requires2FA) {
+        setRequires2FA(true)
+        setLoading(false)
+        toast.error('2FA code is required to complete this transfer')
+        return
+      }
+
+      if (response.data.success) {
+        toast.success('Transfer completed successfully!')
+        onSuccess?.()
+        handleClose()
+      }
+    } catch (error) {
+      console.error('Error creating transfer:', error)
+      
+      // Check if 2FA is required
+      if (error.response?.data?.requires2FA) {
+        setRequires2FA(true)
+        setLoading(false)
+        toast.error('2FA code is required to complete this transfer')
+        return
+      }
+      
+      toast.error(error.response?.data?.message || 'Failed to process transfer')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    setSearchQuery('')
+    setUsers([])
+    setRecentRecipients([])
+    setSelectedUser(null)
+    setAmount('')
+    setDescription('')
+    setTwoFactorCode('')
+    setFee(0)
+    setTotalAmount(0)
+    setStep('search')
+    setRequires2FA(false)
+    onClose()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-lg z-50 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-2xl shadow-2xl w-full max-w-md min-h-[500px] sm:min-h-[600px] max-h-[90vh] border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-t-2xl flex-shrink-0">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white">Internal Transfer</h3>
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {step === 'search' ? (
+          <div className="p-6 space-y-5 flex-1 overflow-y-auto flex flex-col min-h-[400px]">
+            {/* Search */}
+            <div className="flex-shrink-0">
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                <svg className="w-4 h-4 mr-2 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Search User
+              </label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-3.5 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 transition text-base"
+                placeholder="Search by username, email, or ID..."
+              />
+              {searching && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center">
+                  <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Searching...
+                </p>
+              )}
+            </div>
+
+            {/* User List */}
+            <div className="flex-1 min-h-[300px] max-h-[400px] overflow-y-auto space-y-3 pr-1">
+              {searchQuery.length >= 2 ? (
+                // Show search results when user is searching
+                users.length > 0 ? (
+                  users.map((user) => (
+                    <button
+                      key={user._id}
+                      onClick={() => handleUserSelect(user)}
+                      className="w-full p-4 text-left border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition bg-white dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
+                      <div className="font-semibold text-gray-900 dark:text-white">{user.fullName || user.username}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        {user.email} {user.uniqueId && `• ID: ${user.uniqueId}`}
+                      </div>
+                    </button>
+                  ))
+                ) : !searching ? (
+                  <div className="flex items-center justify-center h-full min-h-[250px]">
+                    <div className="text-center py-8">
+                      <svg className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-500 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">No users found</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Try a different search term</p>
+                    </div>
+                  </div>
+                ) : null
+              ) : (
+                // Show recent recipients when not searching
+                loadingRecent ? (
+                  <div className="flex items-center justify-center h-full min-h-[250px]">
+                    <div className="text-center py-8">
+                      <svg className="animate-spin h-8 w-8 mx-auto mb-4 text-indigo-600 dark:text-indigo-400" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">Loading recent recipients...</p>
+                    </div>
+                  </div>
+                ) : recentRecipients.length > 0 ? (
+                  <>
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2 px-1">
+                      Recent Recipients
+                    </div>
+                    {recentRecipients.map((user) => (
+                      <button
+                        key={user._id}
+                        onClick={() => handleUserSelect(user)}
+                        className="w-full p-4 text-left border-2 border-gray-200 dark:border-gray-700 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition bg-white dark:bg-gray-800 shadow-sm hover:shadow-md"
+                      >
+                        <div className="font-semibold text-gray-900 dark:text-white">{user.fullName || user.username}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          {user.email} {user.uniqueId && `• ID: ${user.uniqueId}`}
+                        </div>
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full min-h-[250px]">
+                    <div className="text-center py-8">
+                      <svg className="w-16 h-16 mx-auto mb-4 text-indigo-400 dark:text-indigo-500 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">No recent recipients</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">Start searching for users to transfer</p>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleConfirm} className="p-6 space-y-5 flex-1 overflow-y-auto flex flex-col min-h-[450px]">
+            {/* Selected User Info */}
+            <div className="p-5 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 shadow-sm">
+              <div className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mb-2 uppercase tracking-wide flex items-center">
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                Recipient
+              </div>
+              <div className="font-bold text-lg text-gray-900 dark:text-white">{selectedUser.fullName || selectedUser.username}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{selectedUser.email}</div>
+              {selectedUser.uniqueId && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 font-mono bg-white/50 dark:bg-gray-800/50 px-2 py-1 rounded inline-block">ID: {selectedUser.uniqueId}</div>
+              )}
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                <svg className="w-4 h-4 mr-1.5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Amount ({siteSettings?.site?.currency || 'USDT'})
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min={siteSettings?.transfer?.minAmount || 0}
+                max={siteSettings?.transfer?.maxAmount || 5000}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 transition text-lg font-semibold"
+                placeholder="0.00"
+                required
+              />
+              {siteSettings?.transfer && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 flex items-center space-x-2">
+                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">Min: {siteSettings.transfer.minAmount} {siteSettings.site.currency}</span>
+                  <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">Max: {siteSettings.transfer.maxAmount} {siteSettings.site.currency}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Fee Display */}
+            {amount && fee > 0 && (
+              <div className="p-5 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl border-2 border-gray-200 dark:border-gray-600 shadow-sm">
+                <div className="flex justify-between items-center text-sm mb-3">
+                  <span className="text-gray-600 dark:text-gray-400 font-medium flex items-center">
+                    <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Transfer Fee:
+                  </span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{fee.toFixed(2)} {siteSettings?.site?.currency || 'USDT'}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg pt-3 border-t-2 border-gray-200 dark:border-gray-600">
+                  <span className="text-gray-700 dark:text-gray-300 font-bold">Total Amount:</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xl">{totalAmount.toFixed(2)} {siteSettings?.site?.currency || 'USDT'}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Description */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+                <svg className="w-4 h-4 mr-1.5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Description (Optional)
+              </label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 transition resize-none"
+                placeholder="Add a note..."
+                rows="4"
+              />
+            </div>
+
+            {/* 2FA Code Input */}
+            {requires2FA && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border-2 border-amber-200 dark:border-amber-800">
+                <label className="block text-sm font-semibold text-amber-900 dark:text-amber-200 mb-2 flex items-center">
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  2FA Code *
+                </label>
+                <input
+                  type="text"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  maxLength={6}
+                  required
+                  className="w-full px-4 py-3 border-2 border-amber-300 dark:border-amber-700 rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 text-center text-2xl tracking-widest font-mono"
+                  placeholder="000000"
+                  autoFocus
+                />
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-2 text-center">
+                  Enter the 6-digit code from your authenticator app
+                </p>
+              </div>
+            )}
+
+            {/* Buttons */}
+            <div className="flex space-x-3 pt-4 mt-auto border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setStep('search')}
+                className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-xl font-semibold transition shadow-md hover:shadow-lg transform hover:scale-[1.02]"
+              >
+                ← Back
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl font-semibold transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform hover:scale-[1.02] disabled:hover:scale-100"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </span>
+                ) : (
+                  '✓ Confirm Transfer'
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  )
+}
+

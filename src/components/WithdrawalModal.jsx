@@ -1,0 +1,376 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import api from '../utils/axios'
+import toast from 'react-hot-toast'
+
+export default function WithdrawalModal({ isOpen, onClose, onSuccess }) {
+  const navigate = useNavigate()
+  const [coins, setCoins] = useState([])
+  const [selectedCoin, setSelectedCoin] = useState(null)
+  const [amount, setAmount] = useState('')
+  const [walletAddress, setWalletAddress] = useState('')
+  const [network, setNetwork] = useState('onchain')
+  const [loading, setLoading] = useState(false)
+  const [settings, setSettings] = useState(null)
+  const [fee, setFee] = useState(0)
+  const [totalAmount, setTotalAmount] = useState(0)
+  const [amountError, setAmountError] = useState(null)
+
+  const checkWithdrawalEligibility = async () => {
+    try {
+      // Fetch latest user data and KYC status
+      const [userResponse, kycResponse] = await Promise.all([
+        api.get('/api/auth/me'),
+        api.get('/api/kyc/status')
+      ])
+
+      if (userResponse.data.success && kycResponse.data.success) {
+        const user = userResponse.data.user
+        const kyc = kycResponse.data
+
+        // Check if user is allowed to withdraw
+        if (!user.allowWithdraw) {
+          toast.error('Withdrawals are not allowed for your account. Please contact support.')
+          onClose()
+          return
+        }
+
+        // Check if user account is verified
+        if (!kyc.isVerified || kyc.kyc?.status !== 'approved') {
+          toast.error('Your account must be verified before you can withdraw. Please complete KYC verification.', {
+            duration: 5000
+          })
+          onClose()
+          navigate('/kyc/verify')
+          return
+        }
+      }
+    } catch (error) {
+      console.error('Error checking withdrawal eligibility:', error)
+      toast.error('Unable to verify withdrawal eligibility. Please try again.')
+      onClose()
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      checkWithdrawalEligibility()
+      fetchCoins()
+      fetchSettings()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
+  // Effective min/max from admin panel (platform); coin-specific overrides when set
+  const getEffectiveLimits = () => {
+    if (!settings?.withdrawal) return { minAmount: 0, maxAmount: undefined }
+    const platformMin = settings.withdrawal.minAmount
+    const platformMax = settings.withdrawal.maxAmount
+    const useCoinMin = selectedCoin?.minWithdraw != null && selectedCoin.minWithdraw > 0
+    const useCoinMax = selectedCoin?.maxWithdraw != null && selectedCoin.maxWithdraw > 0
+    return {
+      minAmount: useCoinMin ? selectedCoin.minWithdraw : platformMin,
+      maxAmount: useCoinMax ? selectedCoin.maxWithdraw : platformMax
+    }
+  }
+
+  const effectiveLimits = getEffectiveLimits()
+
+  useEffect(() => {
+    if (amount && selectedCoin && settings) {
+      calculateFee()
+      validateAmount()
+    } else {
+      setAmountError(null)
+    }
+  }, [amount, selectedCoin, settings])
+
+  const validateAmount = () => {
+    if (!amount) {
+      setAmountError(null)
+      return
+    }
+    if (!settings?.withdrawal) {
+      setAmountError(null)
+      return
+    }
+
+    const withdrawalAmount = parseFloat(amount)
+    if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+      setAmountError(null)
+      return
+    }
+
+    const { minAmount: minLimit, maxAmount: maxLimit } = getEffectiveLimits()
+    if (maxLimit == null) return
+
+    if (withdrawalAmount < minLimit) {
+      setAmountError(`Amount is below minimum: ${minLimit} USDT`)
+      return
+    }
+    if (withdrawalAmount > maxLimit) {
+      setAmountError(`Amount exceeds maximum: ${maxLimit} USDT`)
+      return
+    }
+    setAmountError(null)
+  }
+
+  const fetchCoins = async () => {
+    try {
+      const response = await api.get('/api/coins')
+      if (response.data.success) {
+        setCoins(response.data.coins.filter(coin => coin.isActive))
+      }
+    } catch (error) {
+      console.error('Error fetching coins:', error)
+      toast.error('Failed to fetch coins')
+    }
+  }
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/api/withdrawals/settings')
+      if (response.data.success) {
+        setSettings({ withdrawal: response.data.settings.withdrawal })
+      }
+    } catch (error) {
+      console.error('Error fetching settings:', error)
+    }
+  }
+
+  const calculateFee = () => {
+    if (!settings || !amount) {
+      setFee(0)
+      setTotalAmount(0)
+      return
+    }
+
+    const withdrawalAmount = parseFloat(amount) || 0
+    const withdrawalSettings = settings.withdrawal
+
+    let calculatedFee = 0
+    if (withdrawalSettings.feeType === 'percentage') {
+      calculatedFee = (withdrawalAmount * withdrawalSettings.fee) / 100
+    } else {
+      calculatedFee = withdrawalSettings.fee
+    }
+
+    setFee(calculatedFee)
+    setTotalAmount(withdrawalAmount + calculatedFee)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!selectedCoin || !amount || !walletAddress) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    const withdrawalAmount = parseFloat(amount)
+    if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+      toast.error('Please enter a valid amount')
+      return
+    }
+
+    if (!settings) {
+      toast.error('Settings not loaded. Please try again.')
+      return
+    }
+
+    const withdrawalSettings = settings.withdrawal
+    const { minAmount: effectiveMin, maxAmount: effectiveMax } = getEffectiveLimits()
+
+    // Validate against effective limits (admin panel + coin overrides)
+    if (effectiveMin != null && withdrawalAmount < effectiveMin) {
+      toast.error(`Minimum withdrawal amount is ${effectiveMin} USDT`)
+      return
+    }
+    if (effectiveMax != null && withdrawalAmount > effectiveMax) {
+      toast.error(`Maximum withdrawal amount is ${effectiveMax} USDT`)
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await api.post('/api/withdrawals/create', {
+        coinId: selectedCoin._id,
+        coinSymbol: selectedCoin.symbol,
+        amount: withdrawalAmount,
+        walletAddress: walletAddress.trim(),
+        network
+      })
+
+      if (response.data.success) {
+        toast.success('Withdrawal request submitted successfully!')
+        onSuccess?.()
+        handleClose()
+        // Navigate to withdrawal detail page
+        navigate(`/withdrawal/${response.data.withdrawal._id}`)
+      }
+    } catch (error) {
+      console.error('Error creating withdrawal:', error)
+      toast.error(error.response?.data?.message || 'Failed to create withdrawal request')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClose = () => {
+    setSelectedCoin(null)
+    setAmount('')
+    setWalletAddress('')
+    setNetwork('onchain')
+    setFee(0)
+    setTotalAmount(0)
+    onClose()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+      <div className="bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-red-500 to-red-600 rounded-t-xl">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-2">
+              <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-white">Withdraw Funds</h3>
+            </div>
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-white/20 rounded-lg transition text-white"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Coin Selection */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Select Coin</label>
+            <select
+              value={selectedCoin?._id || ''}
+              onChange={(e) => {
+                const coin = coins.find(c => c._id === e.target.value)
+                setSelectedCoin(coin)
+              }}
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition text-gray-900 dark:text-white"
+              required
+            >
+              <option value="">Select a coin</option>
+              {coins.map((coin) => (
+                <option key={coin._id} value={coin._id}>
+                  {coin.symbol} - {coin.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Amount */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Amount (USDT)</label>
+            <input
+              type="number"
+              step="0.01"
+              min={effectiveLimits.minAmount}
+              max={effectiveLimits.maxAmount ?? undefined}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className={`w-full px-4 py-3 border-2 rounded-xl bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 transition text-gray-900 dark:text-white text-lg font-semibold ${
+                amountError 
+                  ? 'border-red-500 dark:border-red-500 focus:border-red-500 focus:ring-red-500' 
+                  : 'border-gray-200 dark:border-gray-600 focus:border-red-500 focus:ring-red-500'
+              }`}
+              placeholder="0.00"
+              required
+            />
+            <div className="mt-2">
+              {settings?.withdrawal ? (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Min: {effectiveLimits.minAmount} USDT
+                    {effectiveLimits.maxAmount != null && ` | Max: ${effectiveLimits.maxAmount} USDT` }
+                  </p>
+                  {amountError && (
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                      {amountError}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">Loading limits...</p>
+              )}
+            </div>
+          </div>
+
+          {/* Fee Display */}
+          {amount && fee > 0 && (
+            <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600 dark:text-gray-400 font-medium">Withdrawal Fee:</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{fee.toFixed(2)} USDT</span>
+              </div>
+              <div className="flex justify-between text-base pt-2 border-t border-gray-200 dark:border-gray-600">
+                <span className="text-gray-700 dark:text-gray-300 font-semibold">Total Deducted:</span>
+                <span className="font-bold text-red-600 dark:text-red-400">{totalAmount.toFixed(2)} USDT</span>
+              </div>
+            </div>
+          )}
+
+          {/* Wallet Address */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Wallet Address</label>
+            <input
+              type="text"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition font-mono text-sm text-gray-900 dark:text-white"
+              placeholder="Enter your wallet address"
+              required
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">⚠️ Double-check the address before submitting</p>
+          </div>
+
+          {/* Network */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Network</label>
+            <select
+              value={network}
+              onChange={(e) => setNetwork(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition text-gray-900 dark:text-white"
+            >
+              <option value="onchain">Onchain</option>
+            </select>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex space-x-3 pt-2">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-xl font-semibold transition shadow-md hover:shadow-lg"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white rounded-xl font-semibold transition shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {loading ? 'Submitting...' : 'Submit Withdrawal'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
