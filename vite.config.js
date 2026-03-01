@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'https://api.basetradingoption.com',
+        target: process.env.VITE_API_URL || 'https://api.basedextrading.com',
         changeOrigin: true,
         secure: true, // Set to true for production HTTPS
         rewrite: (path) => path, // Don't rewrite the path

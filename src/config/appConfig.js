@@ -12,8 +12,8 @@
  * 
  * 3. For production builds, set these in your .env.production file:
  *    VITE_APP_ENV=production
- *    VITE_API_URL=https://api.basetradingoption.com
- *    VITE_FRONTEND_URL=https://basetradingoption.com
+ *    VITE_API_URL=https://api.basedextrading.com
+ *    VITE_FRONTEND_URL=https://basedextrading.com
  */
 
 // Default to production unless explicitly set to development
@@ -22,8 +22,8 @@ const isProduction = import.meta.env.VITE_APP_ENV !== 'development' && import.me
 const isDevelopment = !isProduction
 
 // Production URLs
-const PROD_API_URL = 'https://api.basetradingoption.com'
-const PROD_FRONTEND_URL = 'https://basetradingoption.com'
+const PROD_API_URL = 'https://api.basedextrading.com'
+const PROD_FRONTEND_URL = 'https://basedextrading.com'
 
 // Local/Development URLs
 const LOCAL_API_URL = '' // Empty string uses Vite proxy in development
