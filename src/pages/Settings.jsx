@@ -118,7 +118,7 @@ export default function Settings() {
           <h2 className="text-lg font-bold mb-4">Support & Information</h2>
           <div className="space-y-3">
             <a
-              href="mailto:support@basedextrading.com"
+              href="mailto:support@onchaindextrade.com"
               className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition"
             >
               <div className="flex items-center space-x-3">
