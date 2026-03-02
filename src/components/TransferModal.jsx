@@ -419,11 +419,11 @@ export default function TransferModal({ isOpen, onClose, onSuccess }) {
                     </svg>
                     Transfer Fee:
                   </span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{fee.toFixed(2)} {siteSettings?.site?.currency || 'USDT'}</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{(Number(fee) || 0).toFixed(2)} {siteSettings?.site?.currency || 'USDT'}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg pt-3 border-t-2 border-gray-200 dark:border-gray-600">
                   <span className="text-gray-700 dark:text-gray-300 font-bold">Total Amount:</span>
-                  <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xl">{totalAmount.toFixed(2)} {siteSettings?.site?.currency || 'USDT'}</span>
+                  <span className="font-bold text-indigo-600 dark:text-indigo-400 text-xl">{(Number(totalAmount) || 0).toFixed(2)} {siteSettings?.site?.currency || 'USDT'}</span>
                 </div>
               </div>
             )}

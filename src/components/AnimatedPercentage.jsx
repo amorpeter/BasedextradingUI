@@ -46,7 +46,7 @@ export default function AnimatedPercentage({
 
   return (
     <span className={`${colorClass} ${className} ${isAnimating ? 'font-bold' : ''}`}>
-      {sign}{displayValue.toFixed(2)}%
+      {sign}{(Number(displayValue) || 0).toFixed(2)}%
     </span>
   )
 }

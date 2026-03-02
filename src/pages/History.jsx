@@ -53,12 +53,12 @@ export default function History() {
       totalTrades: closedTrades.length,
       wins: wins.length,
       losses: losses.length,
-      winRate: winRate.toFixed(1),
-      totalProfit: totalProfit.toFixed(2),
-      winProfit: winProfit.toFixed(2),
-      lossAmount: lossAmount.toFixed(2),
-      avgProfit: avgProfit.toFixed(2),
-      avgLoss: avgLoss.toFixed(2)
+      winRate: (Number(winRate) || 0).toFixed(1),
+      totalProfit: (Number(totalProfit) || 0).toFixed(2),
+      winProfit: (Number(winProfit) || 0).toFixed(2),
+      lossAmount: (Number(lossAmount) || 0).toFixed(2),
+      avgProfit: (Number(avgProfit) || 0).toFixed(2),
+      avgLoss: (Number(avgLoss) || 0).toFixed(2)
     }
   }, [tradeHistory])
 
@@ -347,7 +347,7 @@ export default function History() {
                             </svg>
                           )}
                           <div className="text-base font-bold">
-                            {isWin ? '+' : '-'}{profitPercent.toFixed(2)}%
+                            {isWin ? '+' : '-'}{(Number(profitPercent) || 0).toFixed(2)}%
                           </div>
                         </div>
                         <div className={`flex items-center justify-end space-x-1.5 mb-1.5 ${
@@ -453,7 +453,7 @@ export default function History() {
                             </svg>
                           )}
                           <div className="text-sm font-bold">
-                            {isWin ? '+' : '-'}{profitPercent.toFixed(2)}%
+                            {isWin ? '+' : '-'}{(Number(profitPercent) || 0).toFixed(2)}%
                           </div>
                         </div>
                         <div className={`flex items-center justify-end space-x-1 mb-1.5 ${

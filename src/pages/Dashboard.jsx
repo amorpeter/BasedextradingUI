@@ -432,17 +432,15 @@ export default function Dashboard() {
   }
 
   const formatPrice = (price) => {
-    if (price === 0 || !price) return '0.00'
-    if (price < 0.01) {
-      return price.toFixed(6)
-    }
-    if (price < 1) {
-      return price.toFixed(4)
-    }
+    const num = Number(price)
+    if (price == null || price === '' || isNaN(num)) return '0.00'
+    if (num === 0) return '0.00'
+    if (num < 0.01) return num.toFixed(6)
+    if (num < 1) return num.toFixed(4)
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(price)
+    }).format(num)
   }
 
   const formatChange = (change) => {

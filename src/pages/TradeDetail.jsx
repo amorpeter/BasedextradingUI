@@ -273,10 +273,10 @@ export default function TradeDetail() {
                   <div className="text-sm opacity-90">
                     <div>{sideLabel.toUpperCase()} {trade.symbol}</div>
                     <div className={`mt-1 ${profitColor}`}>
-                      {trade.result === 'win' ? 'Win' : 'Loss'}: {profitSign}{profitValue.toFixed(2)}%
+                      {trade.result === 'win' ? 'Win' : 'Loss'}: {profitSign}{(Number(profitValue) || 0).toFixed(2)}%
                     </div>
                     <div className="text-xs opacity-75 mt-1">
-                      Profit: ${trade.profit > 0 ? '+' : ''}{trade.profit.toFixed(2)} USDT
+                      Profit: ${(trade.profit ?? 0) > 0 ? '+' : ''}{(Number(trade.profit) || 0).toFixed(2)} USDT
                     </div>
                   </div>
                 </div>
@@ -374,13 +374,15 @@ export default function TradeDetail() {
   }
 
   const formatPrice = (price) => {
-    if (!price) return '0.00'
-    if (price < 0.01) return price.toFixed(6)
-    if (price < 1) return price.toFixed(4)
+    const num = Number(price)
+    if (price == null || isNaN(num)) return '0.00'
+    if (num === 0) return '0.00'
+    if (num < 0.01) return num.toFixed(6)
+    if (num < 1) return num.toFixed(4)
     return new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    }).format(price)
+    }).format(num)
   }
 
   const formatChange = (change) => {
@@ -414,7 +416,7 @@ export default function TradeDetail() {
 
   const calculateMax = () => {
     // Max is now in USDT (user balance)
-    return userBalance.toFixed(2)
+    return (Number(userBalance) || 0).toFixed(2)
   }
 
   const calculateCost = () => {
@@ -512,7 +514,7 @@ export default function TradeDetail() {
 
     // Use a small tolerance for floating point comparison (0.01 USDT)
     if (usdtAmount > userBalance + 0.01) {
-      toast.error(`Insufficient balance. Available: ${userBalance.toFixed(2)} USDT`)
+      toast.error(`Insufficient balance. Available: ${(Number(userBalance) || 0).toFixed(2)} USDT`)
       return
     }
     
@@ -690,7 +692,7 @@ export default function TradeDetail() {
                   onClick={() => setPrice(parseFloat(ask.price))}
                 >
                   <span className="text-red-500 truncate">{parseFloat(ask.price).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}</span>
-                  <span className="text-right text-gray-600 dark:text-gray-400 truncate">{parseFloat(ask.amount).toFixed(1)}</span>
+                  <span className="text-right text-gray-600 dark:text-gray-400 truncate">{(Number(ask.amount) || 0).toFixed(1)}</span>
                   <span className="text-right text-gray-500 dark:text-gray-500 truncate hidden sm:block">{parseFloat(ask.total).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                 </div>
               ))}
@@ -713,7 +715,7 @@ export default function TradeDetail() {
                   onClick={() => setPrice(parseFloat(bid.price))}
                 >
                   <span className="text-green-500 truncate">{parseFloat(bid.price).toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}</span>
-                  <span className="text-right text-gray-600 dark:text-gray-400 truncate">{parseFloat(bid.amount).toFixed(1)}</span>
+                  <span className="text-right text-gray-600 dark:text-gray-400 truncate">{(Number(bid.amount) || 0).toFixed(1)}</span>
                   <span className="text-right text-gray-500 dark:text-gray-500 truncate hidden sm:block">{parseFloat(bid.total).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>
                 </div>
               ))}
@@ -775,7 +777,7 @@ export default function TradeDetail() {
               <div className="flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Available</span>
                 <div className="flex items-center space-x-1">
-                  <span className="font-semibold">{userBalance.toFixed(2)} USDT</span>
+                  <span className="font-semibold">{(Number(userBalance) || 0).toFixed(2)} USDT</span>
                   <button className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -1303,7 +1305,7 @@ export default function TradeDetail() {
                                     ? 'text-green-600 dark:text-green-400' 
                                     : 'text-red-600 dark:text-red-400'
                                 }`}>
-                                  {isWin ? '+' : '-'}{profitPercent.toFixed(2)}%
+                                  {isWin ? '+' : '-'}{(Number(profitPercent) || 0).toFixed(2)}%
                                 </div>
                                 <div className={`text-base font-bold ${
                                   isWin 

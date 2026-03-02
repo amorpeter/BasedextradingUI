@@ -425,7 +425,7 @@ export default function AddFundsModal({ isOpen, onClose, selectedCoin, onSuccess
                           )}
                           <div className="text-center w-full">
                             <div className="font-semibold text-xs sm:text-sm truncate text-gray-900 dark:text-white">{coin.symbol}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">${coin.price.toFixed(2)}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">${(Number(coin.price) || 0).toFixed(2)}</div>
                           </div>
                         </div>
                       </button>
@@ -465,7 +465,7 @@ export default function AddFundsModal({ isOpen, onClose, selectedCoin, onSuccess
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0 ml-2">
-                          <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">${coin.price.toFixed(2)}</div>
+                          <div className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">${(Number(coin.price) || 0).toFixed(2)}</div>
                         </div>
                       </button>
                     ))
@@ -752,7 +752,7 @@ export default function AddFundsModal({ isOpen, onClose, selectedCoin, onSuccess
                       {(parseFloat(usdtAmount) / (selectedPaymentCoin.price || 1)).toFixed(8)} {selectedPaymentCoin.symbol}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Rate: 1 {selectedPaymentCoin.symbol} = ${selectedPaymentCoin.price.toFixed(2)} USDT
+                      Rate: 1 {selectedPaymentCoin.symbol} = ${(Number(selectedPaymentCoin.price) || 0).toFixed(2)} USDT
                     </div>
                   </div>
                 )}

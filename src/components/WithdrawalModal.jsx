@@ -316,11 +316,11 @@ export default function WithdrawalModal({ isOpen, onClose, onSuccess }) {
             <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 rounded-xl border border-gray-200 dark:border-gray-600">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-600 dark:text-gray-400 font-medium">Withdrawal Fee:</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{fee.toFixed(2)} USDT</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{(Number(fee) || 0).toFixed(2)} USDT</span>
               </div>
               <div className="flex justify-between text-base pt-2 border-t border-gray-200 dark:border-gray-600">
                 <span className="text-gray-700 dark:text-gray-300 font-semibold">Total Deducted:</span>
-                <span className="font-bold text-red-600 dark:text-red-400">{totalAmount.toFixed(2)} USDT</span>
+                <span className="font-bold text-red-600 dark:text-red-400">{(Number(totalAmount) || 0).toFixed(2)} USDT</span>
               </div>
             </div>
           )}

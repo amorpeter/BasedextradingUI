@@ -55,7 +55,7 @@ export default function AnimatedProgressPercentage({
 
   return (
     <span className={`${colorClass} ${className} font-bold`}>
-      {sign}{displayValue.toFixed(2)}%
+      {sign}{(Number(displayValue) || 0).toFixed(2)}%
     </span>
   )
 }

@@ -234,11 +234,11 @@ export default function CoinsList() {
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-semibold">{coin.symbol}</td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">{coin.name}</td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">${coin.price.toFixed(2)}</td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">${(Number(coin.price) || 0).toFixed(2)}</td>
                     <td className={`px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-semibold ${
                       coin.change24h >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                     }`}>
-                      {coin.change24h >= 0 ? '+' : ''}{coin.change24h.toFixed(2)}%
+                      {(Number(coin.change24h) ?? 0) >= 0 ? '+' : ''}{(Number(coin.change24h) || 0).toFixed(2)}%
                     </td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm">{coin.rank}</td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
