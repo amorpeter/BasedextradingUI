@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../utils/axios'
 import { useTheme } from '../context/ThemeContext'
 import { API_URL } from '../utils/apiUrl.js'
 import { useSiteSettings } from '../context/SiteSettingsContext'
@@ -56,7 +56,7 @@ export default function ForgotPassword() {
     setLoading(true)
 
     try {
-      const response = await axios.post('/api/auth/forgot-password', { 
+      const response = await api.post('/api/auth/forgot-password', { 
         email: email.toLowerCase() 
       }, {
         timeout: 10000
