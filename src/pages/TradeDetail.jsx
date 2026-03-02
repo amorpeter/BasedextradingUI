@@ -331,17 +331,17 @@ export default function TradeDetail() {
         const bidPrice = defaultPrice - (i * 0.1)
         const bidAmount = Math.random() * 1000 + 100
         bids.push({
-          price: bidPrice.toFixed(2),
-          amount: bidAmount.toFixed(2),
-          total: (bidPrice * bidAmount).toFixed(2)
+          price: (Number(bidPrice) || 0).toFixed(2),
+          amount: (Number(bidAmount) || 0).toFixed(2),
+          total: ((Number(bidPrice) || 0) * (Number(bidAmount) || 0)).toFixed(2)
         })
         
         const askPrice = defaultPrice + (i * 0.1)
         const askAmount = Math.random() * 1000 + 100
         asks.push({
-          price: askPrice.toFixed(2),
-          amount: askAmount.toFixed(2),
-          total: (askPrice * askAmount).toFixed(2)
+          price: (Number(askPrice) || 0).toFixed(2),
+          amount: (Number(askAmount) || 0).toFixed(2),
+          total: ((Number(askPrice) || 0) * (Number(askAmount) || 0)).toFixed(2)
         })
       }
       
@@ -356,17 +356,17 @@ export default function TradeDetail() {
       const bidPrice = basePrice - (i * 0.1)
       const bidAmount = Math.random() * 1000 + 100
       bids.push({
-        price: bidPrice.toFixed(2),
-        amount: bidAmount.toFixed(2),
-        total: (bidPrice * bidAmount).toFixed(2)
+        price: (Number(bidPrice) || 0).toFixed(2),
+        amount: (Number(bidAmount) || 0).toFixed(2),
+        total: ((Number(bidPrice) || 0) * (Number(bidAmount) || 0)).toFixed(2)
       })
       
       const askPrice = basePrice + (i * 0.1)
       const askAmount = Math.random() * 1000 + 100
       asks.push({
-        price: askPrice.toFixed(2),
-        amount: askAmount.toFixed(2),
-        total: (askPrice * askAmount).toFixed(2)
+        price: (Number(askPrice) || 0).toFixed(2),
+        amount: (Number(askAmount) || 0).toFixed(2),
+        total: ((Number(askPrice) || 0) * (Number(askAmount) || 0)).toFixed(2)
       })
     }
     
@@ -386,9 +386,9 @@ export default function TradeDetail() {
   }
 
   const formatChange = (change) => {
-    if (change === null || change === undefined) return '0.00%'
-    const numChange = typeof change === 'string' ? parseFloat(change) : change
-    if (isNaN(numChange)) return '0.00%'
+    if (change == null || change === '') return '0.00%'
+    const numChange = Number(change)
+    if (Number.isNaN(numChange)) return '0.00%'
     const isPositive = numChange >= 0
     return (
       <span className={isPositive ? 'text-green-500' : 'text-red-500'}>
@@ -421,16 +421,18 @@ export default function TradeDetail() {
 
   const calculateCost = () => {
     // Cost is the USDT amount entered
-    if (!amount) return '0.00'
-    return parseFloat(amount).toFixed(2)
+    if (amount == null || amount === '') return '0.00'
+    return (Number(amount) || 0).toFixed(2)
   }
 
   const calculateAssetAmount = () => {
     // Convert USDT amount to asset amount
-    if (!amount || !currentPrice) return '0.00'
-    const usdtAmount = parseFloat(amount) || 0
-    const assetAmount = usdtAmount / currentPrice
-    return assetAmount.toFixed(8)
+    if (amount == null || amount === '' || currentPrice == null) return '0.00'
+    const usdtAmount = Number(amount) || 0
+    const priceNum = Number(currentPrice) || 0
+    if (priceNum === 0) return '0.00'
+    const assetAmount = usdtAmount / priceNum
+    return (Number(assetAmount) || 0).toFixed(8)
   }
 
   const [userBalance, setUserBalance] = useState(0)

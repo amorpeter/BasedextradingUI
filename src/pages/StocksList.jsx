@@ -48,9 +48,9 @@ export default function StocksList() {
   }
 
   const formatChange = (change) => {
-    if (change === null || change === undefined || change === '') return <span className="text-gray-500">--</span>
-    const numChange = typeof change === 'string' ? parseFloat(change) : change
-    if (isNaN(numChange)) return <span className="text-gray-500">--</span>
+    if (change == null || change === '') return <span className="text-gray-500">--</span>
+    const numChange = Number(change)
+    if (Number.isNaN(numChange)) return <span className="text-gray-500">--</span>
     const isPositive = numChange >= 0
     return (
       <span className={isPositive ? 'text-green-500' : 'text-red-500'}>

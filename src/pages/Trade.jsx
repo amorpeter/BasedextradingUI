@@ -89,8 +89,8 @@ export default function Trade() {
     const numPrice = typeof price === 'string' ? parseFloat(price) : Number(price)
     
     // Check if valid number
-    if (!price && price !== 0) return '0.00'
-    if (isNaN(numPrice)) return '0.00'
+    if (price == null || price === '') return '0.00'
+    if (Number.isNaN(numPrice)) return '0.00'
     
     // Format based on value
     if (numPrice < 0.01) return numPrice.toFixed(6)
@@ -99,9 +99,9 @@ export default function Trade() {
   }
 
   const formatChange = (change) => {
-    if (!change && change !== 0) return '0.00%'
-    const value = typeof change === 'string' ? parseFloat(change) : change
-    if (isNaN(value)) return '0.00%'
+    if (change == null || change === '') return '0.00%'
+    const value = Number(change)
+    if (Number.isNaN(value)) return '0.00%'
     const sign = value >= 0 ? '+' : ''
     return `${sign}${value.toFixed(2)}%`
   }

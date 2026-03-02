@@ -76,8 +76,8 @@ export const getStockPrices = async (symbols = ['AAPL', 'MSFT', 'GOOGL', 'AMZN',
       results.push({
         name: STOCK_NAMES[symbol] || symbol,
         symbol: symbol,
-        price: parseFloat(currentPrice.toFixed(2)),
-        change24h: parseFloat(change24h.toFixed(2))
+        price: parseFloat((Number(currentPrice) || 0).toFixed(2)),
+        change24h: parseFloat((Number(change24h) || 0).toFixed(2))
       })
     })
     

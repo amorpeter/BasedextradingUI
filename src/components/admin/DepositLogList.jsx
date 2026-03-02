@@ -256,7 +256,7 @@ export default function DepositLogList() {
               </div>
               <div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Balance Before</div>
-                <div className="text-sm text-gray-900 dark:text-white">{selectedDeposit.balanceBefore?.toFixed(2) || '0.00'} USDT</div>
+                <div className="text-sm text-gray-900 dark:text-white">{(Number(selectedDeposit.balanceBefore) || 0).toFixed(2)} USDT</div>
               </div>
               <div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Status</div>
@@ -300,11 +300,11 @@ export default function DepositLogList() {
               )}
               <div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Balance Before</div>
-                <div className="text-sm text-gray-900 dark:text-white">{selectedDeposit.balanceBefore?.toFixed(2) || '0.00'} USDT</div>
+                <div className="text-sm text-gray-900 dark:text-white">{(Number(selectedDeposit.balanceBefore) || 0).toFixed(2)} USDT</div>
               </div>
               <div>
                 <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Balance After</div>
-                <div className="text-sm text-gray-900 dark:text-white">{selectedDeposit.balanceAfter?.toFixed(2) || '0.00'} USDT</div>
+                <div className="text-sm text-gray-900 dark:text-white">{(Number(selectedDeposit.balanceAfter) || 0).toFixed(2)} USDT</div>
               </div>
               {selectedDeposit.adminNotes && (
                 <div>

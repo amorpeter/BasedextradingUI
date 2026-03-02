@@ -40,7 +40,7 @@ export const getForexRates = async () => {
         
         return {
           pair,
-          price: price.toFixed(4),
+          price: (Number(price) || 0).toFixed(4),
           change24h
         }
       })

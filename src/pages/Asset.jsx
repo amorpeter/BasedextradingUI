@@ -126,16 +126,18 @@ export default function Asset() {
   };
 
   const formatPrice = (price) => {
-    if (!price || price === 0) return "0.00";
-    if (price < 0.01) return price.toFixed(6);
-    if (price < 1) return price.toFixed(4);
-    return price.toFixed(2);
+    const num = Number(price);
+    if (price == null || price === "" || Number.isNaN(num)) return "0.00";
+    if (num === 0) return "0.00";
+    if (num < 0.01) return num.toFixed(6);
+    if (num < 1) return num.toFixed(4);
+    return num.toFixed(2);
   };
 
   const formatChange = (change) => {
-    if (!change && change !== 0) return "0.00%";
-    const value = parseFloat(change);
-    if (isNaN(value)) return "0.00%";
+    if (change == null || change === "") return "0.00%";
+    const value = Number(change);
+    if (Number.isNaN(value)) return "0.00%";
     const sign = value >= 0 ? "+" : "";
     return `${sign}${value.toFixed(2)}%`;
   };
@@ -169,7 +171,7 @@ export default function Asset() {
 
   const formatMasked = (value) => {
     if (balanceVisible) {
-      return typeof value === "number" ? value.toFixed(2) : value;
+      return typeof value === "number" && value != null ? value.toFixed(2) : (value ?? "0.00");
     }
     return "******";
   };

@@ -213,7 +213,7 @@ export default function Profile() {
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                   <span className="text-gray-600 dark:text-gray-400">Balance</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{user?.balance?.toFixed(2) || '0.00'} USDT</span>
+                  <span className="font-semibold text-gray-900 dark:text-white">{(Number(user?.balance) || 0).toFixed(2)} USDT</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                   <span className="text-gray-600 dark:text-gray-400">Email Verified</span>
@@ -876,13 +876,13 @@ export default function Profile() {
               {selectedDeposit.balanceBefore !== undefined && (
                 <div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Balance Before</div>
-                  <div className="text-sm text-gray-900 dark:text-white">{selectedDeposit.balanceBefore?.toFixed(2) || '0.00'} USDT</div>
+                  <div className="text-sm text-gray-900 dark:text-white">{(Number(selectedDeposit.balanceBefore) || 0).toFixed(2)} USDT</div>
                 </div>
               )}
               {selectedDeposit.balanceAfter !== undefined && (
                 <div>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Balance After</div>
-                  <div className="text-sm text-gray-900 dark:text-white">{selectedDeposit.balanceAfter?.toFixed(2) || '0.00'} USDT</div>
+                  <div className="text-sm text-gray-900 dark:text-white">{(Number(selectedDeposit.balanceAfter) || 0).toFixed(2)} USDT</div>
                 </div>
               )}
               <div>
@@ -1112,7 +1112,7 @@ export default function Profile() {
                 <div className="text-sm font-medium text-gray-900 dark:text-white">
                   {selectedTransfer.fee !== undefined && selectedTransfer.fee !== null 
                     ? `${selectedTransfer.fee} USDT`
-                    : `${(selectedTransfer.amount * 0.02).toFixed(2)} USDT (2%)`
+                    : `${((Number(selectedTransfer.amount) || 0) * 0.02).toFixed(2)} USDT (2%)`
                   }
                 </div>
               </div>

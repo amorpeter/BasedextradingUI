@@ -92,7 +92,7 @@ export default function TradeDetailModal({ trade, onClose }) {
                   ? 'text-green-600 dark:text-green-400' 
                   : 'text-red-600 dark:text-red-400'
               }`}>
-                {isWin ? '+' : '-'}{profitPercent.toFixed(2)}%
+                {isWin ? '+' : '-'}{(Number(profitPercent) || 0).toFixed(2)}%
               </div>
             </div>
           )}
