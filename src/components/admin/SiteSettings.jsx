@@ -63,7 +63,7 @@ export default function SiteSettings() {
             contact: {
               telegram: fetchedSettings.site?.contact?.telegram || '',
               whatsapp: fetchedSettings.site?.contact?.whatsapp || '',
-              email: fetchedSettings.site?.contact?.email || 'support@onchainbittles.online'
+              email: fetchedSettings.site?.contact?.email || 'support@basedextrading.com'
             },
             seo: {
               metaTitle: fetchedSettings.site?.seo?.metaTitle || '',
