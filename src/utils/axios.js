@@ -36,7 +36,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
-      const path = window.location.pathname || ''
+      const path = window.location.pathname || '/'
       const isAdminArea =
         path.startsWith('/admin') || path.startsWith('/subadmin')
       window.location.href = isAdminArea ? '/admin/signin' : '/signin'

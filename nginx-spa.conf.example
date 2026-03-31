@@ -1,5 +1,13 @@
-# Copy/adapt for /etc/nginx/sites-available/basedextrading
-# Replace /var/www/basedextrading with your real path to Vite dist (must contain index.html)
+# =============================================================================
+# REQUIRED for clean URLs: /admin/signin, /dashboard, etc.
+# Without this, Nginx returns 404 for any path except /.
+#
+# 1. npm run build
+# 2. Upload dist/* to e.g. /var/www/basedextrading (must contain index.html)
+# 3. Replace this server block — do NOT use proxy_pass http://localhost:3000 for /
+#    for the React app (that breaks SPA deep links).
+# 4. sudo nginx -t && sudo systemctl reload nginx
+# =============================================================================
 
 server {
     server_name basedextrading.com www.basedextrading.com;
@@ -7,26 +15,11 @@ server {
     root /var/www/basedextrading;
     index index.html;
 
-    # SPA: every unknown path serves index.html so React Router can handle
-    # /admin/signin, /dashboard, /trade/..., etc.
     location / {
         try_files $uri $uri/ /index.html;
     }
-
-    # Optional: API on same host (if you proxy API here; many setups use api.* subdomain instead)
-    # location /api/ {
-    #     proxy_pass http://127.0.0.1:YOUR_API_PORT;
-    #     proxy_http_version 1.1;
-    #     proxy_set_header Host $host;
-    #     proxy_set_header X-Real-IP $remote_addr;
-    #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    #     proxy_set_header X-Forwarded-Proto $scheme;
-    # }
 
     listen 443 ssl;
     ssl_certificate /etc/letsencrypt/live/basedextrading.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/basedextrading.com/privkey.pem;
 }
-
-# If you still proxy to :3000, that process MUST serve index.html for ALL non-file
-# routes (SPA fallback). Prefer static root + try_files above instead.
