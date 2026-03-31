@@ -38,16 +38,22 @@ export default function AdminDashboard() {
     const checkUser = async () => {
       try {
         const response = await api.get('/api/auth/me')
-        if (response.data.success && response.data.user.role === 'admin') {
+        const role = response.data.user?.role
+        if (response.data.success && role === 'admin') {
           fetchDashboardData()
-        } else if (response.data.success && response.data.user.role === 'subadmin') {
-          // Redirect sub-admins to their own dashboard
+        } else if (response.data.success && role === 'subadmin') {
           navigate('/subadmin/dashboard')
+          setLoading(false)
         } else {
           navigate('/admin/signin')
+          setLoading(false)
         }
       } catch (error) {
-        navigate('/admin/signin')
+        setLoading(false)
+        // 401: axios interceptor already redirects to /admin/signin on admin routes
+        if (error.response?.status !== 401) {
+          navigate('/admin/signin')
+        }
       }
     }
     checkUser()

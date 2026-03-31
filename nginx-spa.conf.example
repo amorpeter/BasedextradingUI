@@ -1,0 +1,32 @@
+# Copy/adapt for /etc/nginx/sites-available/basedextrading
+# Replace /var/www/basedextrading with your real path to Vite dist (must contain index.html)
+
+server {
+    server_name basedextrading.com www.basedextrading.com;
+
+    root /var/www/basedextrading;
+    index index.html;
+
+    # SPA: every unknown path serves index.html so React Router can handle
+    # /admin/signin, /dashboard, /trade/..., etc.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Optional: API on same host (if you proxy API here; many setups use api.* subdomain instead)
+    # location /api/ {
+    #     proxy_pass http://127.0.0.1:YOUR_API_PORT;
+    #     proxy_http_version 1.1;
+    #     proxy_set_header Host $host;
+    #     proxy_set_header X-Real-IP $remote_addr;
+    #     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    #     proxy_set_header X-Forwarded-Proto $scheme;
+    # }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/basedextrading.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/basedextrading.com/privkey.pem;
+}
+
+# If you still proxy to :3000, that process MUST serve index.html for ALL non-file
+# routes (SPA fallback). Prefer static root + try_files above instead.

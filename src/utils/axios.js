@@ -30,12 +30,16 @@ api.interceptors.request.use(
 )
 
 // Handle 401 errors (unauthorized)
+// Must send admin/subadmin UI to /admin/signin — not /signin — or admin routes appear "broken"
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
-      window.location.href = '/signin'
+      const path = window.location.pathname || ''
+      const isAdminArea =
+        path.startsWith('/admin') || path.startsWith('/subadmin')
+      window.location.href = isAdminArea ? '/admin/signin' : '/signin'
     }
     return Promise.reject(error)
   }

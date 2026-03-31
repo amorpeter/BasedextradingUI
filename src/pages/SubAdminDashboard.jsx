@@ -43,7 +43,10 @@ export default function SubAdminDashboard() {
         }
       } catch (error) {
         console.error('Error checking user:', error)
-        navigate('/admin/signin')
+        setLoading(false)
+        if (error.response?.status !== 401) {
+          navigate('/admin/signin')
+        }
       }
     }
     checkUser()
